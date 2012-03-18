@@ -21,8 +21,8 @@ def expose(method, interval=hourly):
     return method
 
 class Plugin(object):
-    """A simple plugin object, which is a wrapper that allows various things
-    to be introspected at runtime."""
+    """A simple plugin object, which is a wrapper that allows various things to
+    be introspected at runtime."""
     def __init__(self):
         self.plugin_name = self.__class__.__name__.lower()
         self._expose()
@@ -30,16 +30,14 @@ class Plugin(object):
         registry[self.plugin_name] = self
 
     def _expose(self):
-        if not getattr(self, 'exposed'):
-            return
+        """Allow a list of exposed method names to be set in the classes
+        "exposed" attribute, utilizing either the default expose interval or
+        a default provided by the class in the "interval" attr."""
+        if not getattr(self, 'exposed'): return
         interval = getattr(self, 'interval', hourly)
         for method in self.exposed:
             clsdict = self.__class__.__dict__
-            if isinstance(method, (FunctionType, MethodType)):
-                name = method.__name__
-                expose(clsdict[name], interval)
-            else:
-                expose(clsdict[method], interval)
+            expose(clsdict[method], interval)
 
     def _methods(self):
         """Determine which methods on this plugin are exposed."""
