@@ -25,15 +25,15 @@ def not_found(error):
 
 @app.route('/')
 def index():
-    return jsonify(**{"ok": True})
+    return jsonify(ok=True)
 
 @app.route('/info/')
 def info():
-    return jsonify(**{"ok": True})
+    return jsonify(ok=True)
 
 @app.route('/plugins/')
 def plugins():
-    return jsonify(**{'plugins': plugin.registry.keys(), 'count': len(plugin.registry)})
+    return jsonify(plugins=plugin.registry.keys(), count=len(plugin.registry))
 
 def naturalinterval(secs):
     string = naturaldelta(secs)
@@ -50,7 +50,7 @@ def plugin_info(name):
              'interval': method.interval,
              'human-interval': naturalinterval(method.interval)})
             for plugname,method in plug.methods.items()])
-        return jsonify(**dict(name=name, methods=methods))
+        return jsonify(name=name, methods=methods)
     abort(404)
 
 # FIXME: in the future, it should be possible to get info from HTTP
