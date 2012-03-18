@@ -5,6 +5,7 @@
 
 import sys
 from gevent.wsgi import WSGIServer
+from humanize.time import naturaldelta
 from flask import Flask, request, jsonify, abort
 from arachne import plugin
 from arachne.utils import argspec
@@ -34,13 +35,21 @@ def info():
 def plugins():
     return jsonify(**{'plugins': plugin.registry.keys(), 'count': len(plugin.registry)})
 
+def naturalinterval(secs):
+    string = naturaldelta(secs)
+    string = string.replace('a ', '').replace("an ", "")
+    return "every %s" % string
+
 @app.route('/<name>/')
 def plugin_info(name):
     if name in plugin.registry:
         plug = plugin.registry[name]
         methods = dict([(plugname,
             {'path': '/%s/%s/' % (name, plugname),
-             'spec': argspec(method)}) for plugname,method in plug.methods.items()])
+             'spec': argspec(method),
+             'interval': method.interval,
+             'human-interval': naturalinterval(method.interval)})
+            for plugname,method in plug.methods.items()])
         return jsonify(**dict(name=name, methods=methods))
     abort(404)
 
