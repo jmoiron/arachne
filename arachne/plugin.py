@@ -10,6 +10,7 @@ from arachne.utils import Registry
 registry = Registry()
 
 hourly = 3600
+daily = 86400
 half_hourly = 1600
 
 is_method = lambda m: isinstance(m, (FunctionType, MethodType))

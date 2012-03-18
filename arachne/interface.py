@@ -4,9 +4,10 @@
 """A gevent/wsgi/flask re-implementation of the interface server."""
 
 import sys
+import ujson as json
 from gevent.wsgi import WSGIServer
 from humanize.time import naturaldelta
-from flask import Flask, request, jsonify, abort
+from flask import Flask, Response, request, abort
 from arachne import plugin
 from arachne.utils import argspec
 from arachne.conf import settings, merge
@@ -16,6 +17,10 @@ class Config(object):
     DEBUG = True
 app = Flask(__name__)
 app.config.from_object(Config())
+
+def jsonify(*a, **kw):
+    resp = json.dumps(kw) if kw and not a else json.dumps(a[0])
+    return Response(resp, 200, headers={'content-type': 'application/json'})
 
 @app.errorhandler(404)
 def not_found(error):
@@ -40,17 +45,25 @@ def naturalinterval(secs):
     string = string.replace('a ', '').replace("an ", "")
     return "every %s" % string
 
+def methods_for(plugin):
+    return dict([(name, {
+        "path": "/%s/%s/" % (plugin.plugin_name, name),
+        "spec": argspec(method),
+        "interval": method.interval,
+        "human-interval": naturalinterval(method.interval),
+    }) for name,method in plugin.methods.iteritems()])
+
+@app.route("/methods/")
+def methods():
+    ret = {}
+    for name,plug in plugin.registry.items():
+        ret[name] = methods_for(plug)
+    return jsonify(ret)
+
 @app.route('/<name>/')
 def plugin_info(name):
     if name in plugin.registry:
-        plug = plugin.registry[name]
-        methods = dict([(plugname,
-            {'path': '/%s/%s/' % (name, plugname),
-             'spec': argspec(method),
-             'interval': method.interval,
-             'human-interval': naturalinterval(method.interval)})
-            for plugname,method in plug.methods.items()])
-        return jsonify(name=name, methods=methods)
+        return jsonify(name=name, methods=methods_for(plugin.registry[name]))
     abort(404)
 
 # FIXME: in the future, it should be possible to get info from HTTP
@@ -71,8 +84,11 @@ def plugin_function(name, function):
     else:
         content = settings.server.run_method(method, **clean(request.args))
         if isinstance(content, (dict, list)):
-            return jsonify(**content)
-        return content, 500
+            return jsonify(content)
+        elif isinstance(content, basestring):
+            if "Traceback" in content:
+                return content, 500
+            return content, 200
 
 def serve(port=5000):
     server = WSGIServer(('', port), app)
