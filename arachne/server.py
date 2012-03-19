@@ -25,8 +25,9 @@ class Server(object):
             return traceback.format_exc()
 
 class InterfaceServer(Server):
-    def __init__(self, port=settings.port, plugins=[]):
+    def __init__(self, port=settings.port, plugins=[], debug=False):
         settings.server = self
+        self.debug = debug
         self.greenlets = []
         self.plugins = plugins
         self.port = port
@@ -42,12 +43,18 @@ class InterfaceServer(Server):
         """Run a method and save its results to the datastore.  Returns either
         a string (on failures) or a dict to be sent to the client."""
         user_id = args.get('site_user_id', args.get('user_id', None))
-        result = super(InterfaceServer, self).run_method(method, **args)
-        if user_id and isinstance(result, dict):
-            uuid = uuid4().hex
-            self.datastore.set(user_id, result, uuid)
-            return {uuid: result}
-        return result
+        def get_result():
+            result = super(InterfaceServer, self).run_method(method, **args)
+            if user_id and isinstance(result, dict):
+                uuid = uuid4().hex
+                self.datastore.set(user_id, result, uuid)
+                return {uuid: result}
+            return result
+        try:
+            return get_result()
+        except:
+            if self.debug: import ipdb; ipdb.set_trace();
+            else: raise
 
     def serve(self):
         """Serve the HTTP interface for the InterfaceServer.  Blocks the

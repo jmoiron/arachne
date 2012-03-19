@@ -69,6 +69,11 @@ def plugin_info(name):
 # FIXME: in the future, it should be possible to get info from HTTP
 # on each plugin function with GET, and we should send our requests
 # as POST.
+
+@app.route('/<name>/<function>', methods=['GET', 'POST'])
+def plugin_function_noslash(name, function):
+    return plugin_function(name, function)
+
 @app.route('/<name>/<function>/', methods=['GET', 'POST'])
 def plugin_function(name, function):
     if name not in plugin.registry:
