@@ -15,7 +15,7 @@ defaults = {
 
 class MysqlClient(object):
     def __init__(self, **kw):
-        config = merge(settings.like("mysql"), kw)
+        config = merge(defaults, settings.like("mysql"), kw)
         require(self, config, ("host", "password", "username", "database"))
         self.config = config
         self.pool = {}
