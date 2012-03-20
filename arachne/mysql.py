@@ -13,7 +13,7 @@ defaults = {
     "port": 3306,
 }
 
-class MysqlClient(object):
+class Mysql(object):
     def __init__(self, **kw):
         config = merge(defaults, settings.like("mysql"), kw)
         require(self, config, ("host", "password", "username", "database"))

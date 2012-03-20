@@ -36,7 +36,8 @@ from heapq import heappush, heappop, heapify, heapreplace
 class Heap(object):
     """Heap class using heapq library."""
     def __init__(self, items=None):
-        self.items = heapify(items or [])
+        self.items = items or []
+        heapify(self.items)
 
     def pop(self):
         return heappop(self.items)
@@ -49,4 +50,10 @@ class Heap(object):
 
     def __getitem__(self, item):
         return self.items[item]
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __len__(self):
+        return len(self.items)
 

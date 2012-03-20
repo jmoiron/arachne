@@ -4,16 +4,19 @@
 """servers."""
 
 from uuid import uuid4
-from gevent import spawn
+from time import time, mktime
+import gevent
 from gevent.wsgi import WSGIServer
 from arachne.conf import settings
 from arachne.utils import argspec, Heap
 
-from ginkgo.core import Service
-
 import traceback
 
-class Server(Service):
+class Server(object):
+    def __init__(self, *a, **kw):
+        settings.server = self
+        self.greenlets = []
+
     def run_method(self, method, **args):
         """Runs a method with some arguments, catching all manner of error
         conditions and logging them appropriately"""
@@ -26,47 +29,74 @@ class Server(Service):
         except Exception, e:
             return traceback.format_exc()
 
+    def serve(self, port, app, block=False):
+        from gevent.wsgi import WSGIServer
+        server = WSGIServer(('', port), app)
+        if not block:
+            self.greenlets.append(gevent.spawn(server.serve_forever))
+        else:
+            server.serve_forever()
+
 class SchedulerServer(Server):
-    def __init__(self, port=settings.port, plugins=[], debug=False):
-        settings.server = self
+    def __init__(self, port=settings.port, plugins=[], debug=False, app=None):
+        super(SchedulerServer, self).__init__()
+        self.port = settings.like("scheduler_server").get("port", 8070)
+        self.state = "stopped"
         self.greenlets = []
         self.port = port
-        self.plugins = plugins
+        self.plugins = [p() for p in plugins]
         self.jobheap = Heap()
-        for plugin in self.plugins:
-            plugin()
+        self.app = app
 
     def start(self):
         from arachne import amqp
-        self.queue = amqp.AmqpClient()
-        self.mysql = mysql.MysqlClient()
+        if not self.app:
+            from arachne.web import scheduler
+            self.app = scheduler.app
+        self.queue = amqp.Amqp()
+        self.state = "initializing"
+        self.serve(self.port, self.app)
+        self.update_queue_status(self.queue)
+        self.run()
+
+    def update_queue_status(self, queue):
+        def updater():
+            while 1:
+                self.queue_status = queue.status()
+                gevent.sleep(10)
+        self.greenlets.append(gevent.spawn(updater))
+
+
+    def run(self):
+        """Subclass and implement a scheduler that puts jobs on self.queue."""
+        self.state = "running"
+        while 1:
+            gevent.sleep(1)
+
+    def shutdown(self):
+        pass
 
 
 class WorkerServer(Server):
     def __init__(self, port=settings.port, plugins=[], debug=False):
-        settings.server = self
-        self.greenlets = []
-        self.plugins = plugins
+        super(InterfaceServer, self).__init__()
+        self.plugins = [p() for p in plugins]
         self.port = port
-        for plugin in plugins:
-            plugin()
 
     def start(self):
         pass
 
 class InterfaceServer(Server):
     def __init__(self, port=settings.port, plugins=[], debug=False):
-        settings.server = self
-        self.greenlets = []
-        self.plugins = plugins
+        super(InterfaceServer, self).__init__()
+        self.plugins = [p() for p in plugins]
         self.port = port
-        for plugin in plugins:
-            plugin()
 
     def start(self):
+        from arachne.web import interface
         from arachne.cassandra import Cassandra
         self.datastore = Cassandra()
-        self.serve()
+        self.serve(self.port, interface.app, True)
 
     def run_method(self, method, **args):
         """Run a method and save its results to the datastore.  Returns either
@@ -80,10 +110,5 @@ class InterfaceServer(Server):
             return {uuid: result}
         return result
 
-    def serve(self):
-        """Serve the HTTP interface for the InterfaceServer.  Blocks the
-        current greenlet, so spawn if you want it to happen in the background."""
-        from arachne import interface
-        interface.serve(self.port)
 
 

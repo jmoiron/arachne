@@ -3,6 +3,7 @@
 
 """AMQP adapters for the scheduler."""
 
+from functools import wraps
 from gevent import queue, sleep
 from time import time
 
@@ -15,7 +16,18 @@ defaults = {
     "queue_size": 100,
 }
 
-class AmqpClient(object):
+def autoreconnect(func):
+    @wraps(func)
+    def wrapper(self, *a, **kw):
+        try:
+            ret = func(self, *a, **kw)
+        except:
+            self.reconnect()
+            ret = func(self, *a, **kw)
+        return ret
+    return wrapper
+
+class Amqp(object):
     def __init__(self, **kw):
         config = merge(defaults, settings.like("amqp"), kw)
         required = ("port", "username", "password", "host", "vhost", "exchange", "queue")
@@ -32,14 +44,23 @@ class AmqpClient(object):
             password=self.password
         )
         qa = dict(durable=False, auto_delete=False)
-        self.channel = self.connection.channel(2)
+        self.channel = self.connection.channel()
         self.channel.queue_declare(queue=self.queue,exclusive=False, **qa)
         self.channel.exchange_declare(self.exchange, type="fanout", **qa)
         self.channel.queue_bind(queue=self.queue, exchange=self.exchange)
 
+    @autoreconnect
+    def status(self, cached=True):
+        status = self.channel.queue_declare(queue=self.queue, exclusive=False,
+                durable=False, auto_delete=False)
+        name, message_count, consumer_count = status
+        return dict(name=status[0], messages=status[1], consumers=status[2])
+
+    @autoreconnect
     def publish(self, message, queue=None):
         self.channel.basic_publish(amqp.Message(message), queue or self.queue)
 
+    @autoreconnect
     def get(self, queue=None):
         """Attempt to get something from a queue.  If queue is None, uses the
         default queue for this client."""

@@ -5,13 +5,11 @@
 
 import sys
 import ujson as json
-from gevent.wsgi import WSGIServer
 from humanize.time import naturaldelta
 from flask import Flask, Response, request, abort
 from arachne import plugin
 from arachne.utils import argspec
-from arachne.conf import settings, merge
-import traceback
+from arachne.conf import settings
 
 class Config(object):
     DEBUG = True
@@ -94,10 +92,6 @@ def plugin_function(name, function):
             if "Traceback" in content:
                 return content, 500
             return content, 200
-
-def serve(port=5000):
-    server = WSGIServer(('', port), app)
-    server.serve_forever()
 
 def clean(args):
     """Returns singular values for multidict keys if the length is one."""

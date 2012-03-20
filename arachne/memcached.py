@@ -13,7 +13,7 @@ defaults = {
     "port": 11211,
 }
 
-class MemcachedClient(object):
+class Memcached(object):
     def __init__(self, **kw):
         config = merge(defaults, settings.like("memcached"), kw)
         require(self, config, ("host", "port"))

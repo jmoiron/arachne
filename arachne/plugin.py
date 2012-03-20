@@ -4,10 +4,27 @@
 """Plugin support."""
 
 import inspect
+from itertools import chain
 from types import FunctionType, MethodType
 from arachne.utils import Registry
 
-registry = Registry()
+class PluginRegistry(Registry):
+    """Registry that allows for some distinct features."""
+    aliases = {}
+
+    def by_path(self, path):
+        if path in self.aliases:
+            return self.aliases[path]
+        plugin, method = path.split('/')
+        if plugin in self and method in self[plugin].methods:
+            return self[plugin].methods[method]
+        return None
+
+    def alias(self, name, path):
+        """Alias a new name, which is a path, to an existing path."""
+        self.aliases[name] = self.by_path(path)
+
+registry = PluginRegistry()
 
 hourly = 3600
 daily = 86400
