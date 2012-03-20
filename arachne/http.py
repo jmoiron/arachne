@@ -4,11 +4,13 @@
 """Http support for spider activity."""
 
 import requests
+import ujson as json
+
+import umemcache
 from functools import wraps
-from arachne.conf import merge
 from urllib import urlencode
 from urlparse import urljoin
-import ujson as json
+from arachne.conf import merge, settings, merge
 
 # OAuth v1.0a support from requests-oauth
 from oauth_hook import OAuthHook
@@ -31,8 +33,13 @@ def oauth_client(token, secret, consumer_key, consumer_secret, header_auth=False
     """An OAuth client that can issue get requests."""
     hook = OAuthHook(token, secret, consumer_key, consumer_secret, header_auth)
     client = requests.session(hooks={'pre_request': hook})
-    client.get = _get_wrapper(client.get)
+    client.get = wrapget(client.get)
     return client
+
+class MemcachedHeaderCache(object):
+    def __init__(self, **kw):
+        config = merge(self.defaults, settings.like("header_cache"), kw)
+        require(self, config, ("hosts", "port"))
 
 class OAuthGetter(object):
     """A getter that will sign requests with OAuth v1.0a headers/url params."""
@@ -64,18 +71,23 @@ class Getter(object):
         return get(url, *a, **kw)
 
 def join(*parts):
-    return '/'.join([p.strip('/') for p in parts])
+    parts = filter(None, parts)
+    url = '/'.join([p.strip('/') for p in parts])
+    if parts[-1][-1] == '/':
+        url = url + '/'
+    return url
 
-def _get_wrapper(func):
+def wrapget(func):
     """Wrap requests' `get` function with utility, convenience, book-keeping."""
     @wraps(func)
     def wrapped(*a, **kw):
         is_json = kw.pop('json', False)
         response = func(*a, **kw)
-        if response.headers['content-type'] in json_types or is_json:
+        if response.headers['content-type'] in json_types or \
+           response.headers['content-type'].startswith('application/json') or is_json:
             response.json = json.loads(response.content)
         return response
     return wrapped
 
-get = _get_wrapper(requests.get)
+get = wrapget(requests.get)
 

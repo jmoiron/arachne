@@ -30,3 +30,23 @@ def keygetter(key, default=None):
     def getkey(obj):
         return obj.get(key, default)
     return getkey
+
+from heapq import heappush, heappop, heapify, heapreplace
+
+class Heap(object):
+    """Heap class using heapq library."""
+    def __init__(self, items=None):
+        self.items = heapify(items or [])
+
+    def pop(self):
+        return heappop(self.items)
+
+    def push(self, item):
+        return heappush(self.items, item)
+
+    def replace(self, item):
+        return heapreplace(self.items, item)
+
+    def __getitem__(self, item):
+        return self.items[item]
+
