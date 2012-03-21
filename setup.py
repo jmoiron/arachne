@@ -22,7 +22,7 @@ setup(
     long_description=open('README.rst').read(),
     # Get strings from http://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
-        'Development Status :: 1 - Planning',
+        'Development Status :: 3 - Alpha'
     ],
     keywords='spider gevent requests rabbitmq',
     author='Jason Moiron',
@@ -35,7 +35,15 @@ setup(
     zip_safe=False,
     test_suite="tests",
     install_requires=[
-      # -*- Extra requirements: -*-
+        "umysql",
+        "umemcache",
+        "pycassa",
+        "requests",
+        "requests-oauth",
+        "ujson",
+        "gevent",
+        "kombu",
+        "humanize",
     ],
     entry_points="""
     # -*- Entry points: -*-
