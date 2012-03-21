@@ -6,10 +6,10 @@ web spider written at `hiidef`_ for `flavors.me`_.  It features a very similar
 high level architecture, but implements them differently to achieve a few
 important objectives:
 
- * HTTP interfaces should be rich and easily extendable
- * Plugins should be easy to run synchronously
- * DRY-ness in the resultant plugin code
- * Should not depend on undocumented architectural decisions
+* HTTP interfaces should be rich and easily extendable
+* Plugins should be easy to run synchronously
+* DRY-ness in the resultant plugin code
+* Should not depend on undocumented architectural decisions
 
 Asynchronicity is achieved with `gevent`_, which should be patched by users of
 arachne.  Without patching, arachne behaves synchronously and nearly all of its
