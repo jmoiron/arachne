@@ -36,10 +36,6 @@ def oauth_client(token, secret, consumer_key, consumer_secret, header_auth=False
     client.get = wrapget(client.get)
     return client
 
-class MemcachedHeaderCache(object):
-    def __init__(self, **kw):
-        config = merge(self.defaults, settings.like("header_cache"), kw)
-        require(self, config, ("hosts", "port"))
 
 class OAuthGetter(object):
     """A getter that will sign requests with OAuth v1.0a headers/url params."""

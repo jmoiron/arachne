@@ -4,7 +4,7 @@
 """AMQP adapters for the scheduler."""
 
 from functools import wraps
-from gevent import queue, sleep
+from gevent import queue, sleep, getcurrent
 from time import time
 
 from arachne.conf import settings, merge, require
@@ -34,6 +34,36 @@ class Amqp(object):
         require(self, config, required)
         self.__dict__.update(config)
         self.config = config
+        self.pool = {}
+
+    def client(self):
+        current = getcurrent()
+        if current in self.pool:
+            return self.pool[current]
+        c = self.config
+        client = AmqpClient(**c)
+        self.pool[current] = client
+        return client
+
+    def reconnect(self):
+        return self.client().reconnect()
+
+    def status(self, **kw):
+        return self.client().status(**kw)
+
+    def publish(self, *a, **kw):
+        return self.client().publish(*a, **kw)
+
+    def get(self, *a, **kw):
+        return self.client().get(*a, **kw)
+
+    def poll(self, *a, **kw):
+        return self.client().poll(*a, **kw)
+
+class AmqpClient(object):
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+        self.config = kw
         self.reconnect()
 
     def reconnect(self):

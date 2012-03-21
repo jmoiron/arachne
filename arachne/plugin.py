@@ -32,6 +32,17 @@ half_hourly = 1600
 
 is_method = lambda m: isinstance(m, (FunctionType, MethodType))
 
+def argument_alias(method, args):
+    """Apply argument aliases for a method.  These aliases are stored on
+    the plugin and are additive to the args.  Args are modified in place but
+    also returned."""
+    plugin = method.im_self
+    if not hasattr(plugin, 'aliases'):
+        return args
+    for k,v in plugin.aliases.iteritems():
+        args[k] = args[v]
+    return args
+
 def interval(seconds, **kw):
     """Mark a methods interval individually.  You can also pass any other
     keys you want the function to be marked with, ex. for richer QOS interval

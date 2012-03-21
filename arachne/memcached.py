@@ -8,6 +8,7 @@ import umemcache
 import gevent
 
 from arachne.conf import settings, merge, require
+from arachne.utils import encode, decode
 
 defaults = {
     "port": 11211,
@@ -30,11 +31,9 @@ class Memcached(object):
         self.pool[current] = con
         return con
 
-    def get(self, key, *default):
+    def get(self, key):
         ret = self.client().get(key)
-        if ret is None and default:
-            return default[0]
-        return ret
+        return ret[0] if ret else ret
 
     def set(self, key, data, *a):
         self.client().set(key, data, *a)

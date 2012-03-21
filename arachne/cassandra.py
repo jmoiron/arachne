@@ -3,9 +3,9 @@
 
 """cassandra support for unwound spider using pycassa"""
 
-import zlib
-import ujson as json
 import pycassa
+
+from arachne import utils
 from arachne.conf import settings, merge, require
 
 defaults = {
@@ -17,15 +17,13 @@ defaults = {
     'prefill': False,
 }
 
-def encode(obj):
-    """Encode data for insertion into cassandra."""
-    return zlib.compress(json.dumps(obj))
+encode = utils.encode
 
 def decode(data, colname=None):
-    """Decode data coming out of cassandra."""
+    """Decode data coming out of storage."""
     if colname:
-        return json.loads(zlib.decompress(data[colname]))
-    return json.loads(zlib.decompress(data))
+        return utils.decode(data[colname])
+    return utils.decode(data)
 
 
 class Cassandra(object):

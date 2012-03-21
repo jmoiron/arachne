@@ -5,12 +5,21 @@
 
 from uuid import uuid4
 from time import time, mktime
+from functools import wraps
+
 import gevent
 from gevent.wsgi import WSGIServer
 from arachne.conf import settings
 from arachne.utils import argspec, Heap
+from arachne import amqp
 
 import traceback
+
+def autospawn(func):
+    @wraps(func)
+    def wrapper(self, *a, **kw):
+        self.greenlets.append(gevent.spawn(func, self, *a, **kw))
+    return wrapper
 
 class Server(object):
     def __init__(self, *a, **kw):
@@ -37,54 +46,44 @@ class Server(object):
         else:
             server.serve_forever()
 
-class SchedulerServer(Server):
-    def __init__(self, port=settings.port, plugins=[], debug=False, app=None):
-        super(SchedulerServer, self).__init__()
-        self.port = settings.like("scheduler_server").get("port", 8070)
-        self.state = "stopped"
-        self.greenlets = []
-        self.port = port
-        self.plugins = [p() for p in plugins]
-        self.jobheap = Heap()
-        self.app = app
-
+class QueueServer(Server):
     def start(self):
-        from arachne import amqp
-        if not self.app:
-            from arachne.web import scheduler
-            self.app = scheduler.app
         self.queue = amqp.Amqp()
         self.state = "initializing"
         self.serve(self.port, self.app)
         self.update_queue_status(self.queue)
         self.run()
 
+    @autospawn
     def update_queue_status(self, queue):
-        def updater():
-            while 1:
-                self.queue_status = queue.status()
-                gevent.sleep(10)
-        self.greenlets.append(gevent.spawn(updater))
-
+        while 1:
+            self.queue_status = queue.status()
+            gevent.sleep(10)
 
     def run(self):
         """Subclass and implement a scheduler that puts jobs on self.queue."""
         self.state = "running"
-        while 1:
-            gevent.sleep(1)
-
-    def shutdown(self):
-        pass
+        while 1: gevent.sleep(1)
 
 
-class WorkerServer(Server):
-    def __init__(self, port=settings.port, plugins=[], debug=False):
-        super(InterfaceServer, self).__init__()
-        self.plugins = [p() for p in plugins]
+class SchedulerServer(QueueServer):
+    def __init__(self, port=settings.port, plugins=[], debug=False, app=None):
+        super(SchedulerServer, self).__init__()
         self.port = port
+        self.state = "stopped"
+        self.plugins = [p() for p in plugins]
+        self.app = app
+        self.jobheap = Heap()
 
-    def start(self):
-        pass
+
+class WorkerServer(QueueServer):
+    def __init__(self, port=settings.port, plugins=[], debug=False, app=None):
+        super(WorkerServer, self).__init__()
+        self.port = port
+        self.state = "stopped"
+        self.plugins = [p() for p in plugins]
+        self.app = app
+
 
 class InterfaceServer(Server):
     def __init__(self, port=settings.port, plugins=[], debug=False):

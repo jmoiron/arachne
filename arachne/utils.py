@@ -5,6 +5,8 @@
 
 import re
 import inspect
+import zlib
+import ujson as json
 from collections import defaultdict
 
 class Registry(defaultdict):
@@ -30,6 +32,14 @@ def keygetter(key, default=None):
     def getkey(obj):
         return obj.get(key, default)
     return getkey
+
+def encode(obj):
+    """Encode data for insertion into storage."""
+    return zlib.compress(json.dumps(obj))
+
+def decode(data):
+    """Decode data coming out of storage."""
+    return json.loads(zlib.decompress(data))
 
 from heapq import heappush, heappop, heapify, heapreplace
 
