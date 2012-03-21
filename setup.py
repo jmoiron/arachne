@@ -44,6 +44,7 @@ setup(
         "gevent",
         "kombu",
         "humanize",
+        "flask",
     ],
     entry_points="""
     # -*- Entry points: -*-
