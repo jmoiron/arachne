@@ -10,7 +10,7 @@ from functools import wraps
 
 import gevent
 from gevent.wsgi import WSGIServer
-from arachne.http import HttpError
+from arachne.http import HttpError, CacheHit
 from arachne.conf import settings
 from arachne.utils import argspec, Heap
 from arachne import amqp
