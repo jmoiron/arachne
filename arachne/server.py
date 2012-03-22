@@ -3,6 +3,7 @@
 
 """servers."""
 
+import logging
 from uuid import uuid4
 from time import time, mktime
 from functools import wraps
@@ -21,6 +22,8 @@ def autospawn(func):
     def wrapper(self, *a, **kw):
         self.greenlets.append(gevent.spawn(func, self, *a, **kw))
     return wrapper
+
+logger = logging.getLogger(__name__)
 
 class Server(object):
     def __init__(self, *a, **kw):
