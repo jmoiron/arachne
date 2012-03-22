@@ -43,6 +43,9 @@ class Server(object):
             message = "%s Cancelled %s/%s" % (e.message, method.im_self.plugin_name, method.__name__)
             logger.warning(message)
             return message
+        except CacheHit, e:
+            logger.info("Cache Hit: %s" % e.message)
+            return ""
         except Exception, e:
             return traceback.format_exc()
 
