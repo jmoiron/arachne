@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 class Server(object):
     def __init__(self, *a, **kw):
         settings.server = self
+        self.proxy = None
         self.greenlets = []
 
     def run_method(self, method, **args):

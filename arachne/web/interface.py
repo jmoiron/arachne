@@ -7,7 +7,7 @@ import sys
 import ujson as json
 from humanize.time import naturaldelta
 from flask import Flask, Response, request, abort
-from arachne import plugin
+from arachne import plugin, http
 from arachne.utils import argspec
 from arachne.conf import settings
 
@@ -72,12 +72,26 @@ def plugin_info(name):
 def plugin_function_noslash(name, function):
     return plugin_function(name, function)
 
-@app.route('/<name>/<function>/', methods=['GET', 'POST'])
+def proxy(request):
+    params = dict(request.args.items())
+    url = http.join(settings.server.proxy, request.path)
+    try:
+        result = http.get(url, params=params, json=True)
+        return jsonify(result.json)
+    except:
+        return traceback.format_exc(), 500
+
+@app.route('/<name>/<function>/',methods=['GET', 'POST'])
 def plugin_function(name, function):
     if name not in plugin.registry:
+        # proxy unknown plugin requests to some other interface
+        if settings.server.proxy:
+            return proxy(request)
         abort(404)
     plug = plugin.registry[name]
     if function not in plug.methods:
+        if settings.server.proxy:
+            return proxy(request)
         abort(404)
     method = plug.methods[function]
     if request.method == 'POST':

@@ -115,7 +115,7 @@ def wrapget(func):
         # parse json
         if response.headers['content-type'] in json_types or \
            response.headers['content-type'].startswith('application/json') or is_json:
-            response.json = json.loads(response.content)
+            response.json = json.loads(response.content) if response.content else {}
         # if an error occured and we waned to raise an exception, do it;  we
         # can still take the response off of this error
         if response.status_code > 400 and not ignore_errors:
@@ -134,14 +134,12 @@ def cache_manager(func):
         ch = header_cache.get(url)
         if "expires" in ch and ch["expires"] > utcnow():
             raise CacheHit("Expires in the future.")
-
         kw.setdefault("headers", {}).update(ch)
 
         response = func(*a, **kw)
 
         if response.status_code == 304:
             raise CacheHit("304 status code.")
-
         # set cache control headers if available
         ch = cache_headers(response.headers)
         if ch:
