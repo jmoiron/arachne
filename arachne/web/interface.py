@@ -10,6 +10,7 @@ from flask import Flask, Response, request, abort
 from arachne import plugin, http
 from arachne.utils import argspec
 from arachne.conf import settings
+import traceback
 
 class Config(object):
     DEBUG = True
@@ -22,7 +23,7 @@ def jsonify(*a, **kw):
 
 @app.errorhandler(404)
 def not_found(error):
-    response = jsonify({'ok': False, 'error': error.message})
+    response = jsonify({'ok': False, 'error': str(error)})
     response.status_code = 404
     return response
 
@@ -83,17 +84,11 @@ def proxy(request):
 
 @app.route('/<name>/<function>/',methods=['GET', 'POST'])
 def plugin_function(name, function):
-    if name not in plugin.registry:
-        # proxy unknown plugin requests to some other interface
+    method = plugin.registry.by_path("%s/%s" % (name, function))
+    if not method:
         if settings.server.proxy:
             return proxy(request)
         abort(404)
-    plug = plugin.registry[name]
-    if function not in plug.methods:
-        if settings.server.proxy:
-            return proxy(request)
-        abort(404)
-    method = plug.methods[function]
     if request.method == 'POST':
         response = jsonify(ok=False, error="POST not yet supported.")
         response.status_code = 500

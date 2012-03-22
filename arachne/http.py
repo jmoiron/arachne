@@ -12,7 +12,7 @@ from dateutil.parser import parse as dateparse
 
 from functools import wraps
 from urllib import urlencode
-from urlparse import urljoin
+from urlparse import urljoin, parse_qs
 from hashlib import md5
 
 from arachne import memcached
@@ -41,6 +41,10 @@ class CacheHit(Exception):
 
 # -- utils --
 
+def mdict2sdict(mdict):
+    """Turn a multidict into a singledict for single element lists in the dict."""
+    return dict([(k, v[0] if isinstance(v, list) and len(v) == 1 else v) for k,v in mdict.iteritems()])
+
 def requests_url(*a, **kw):
     """Return a url for a requests.get call."""
     if 'params' in kw:
@@ -65,6 +69,35 @@ def oauth_client(token, secret, consumer_key, consumer_secret, header_auth=False
     return client
 
 # -- HTTP Get wrappers --
+
+class OAuthTokenGetter(object):
+    """A getter for requesting tokens and authorizing those tokens."""
+    def __init__(self, consumer_key, consumer_secret):
+        self.client_params = {'consumer_key': consumer_key, 'consumer_secret': consumer_secret}
+        self.key = consumer_key
+        self.secret = consumer_secret
+
+    def request_token(self, url, **kw):
+        """Request an unauthorized token at the request token url.  kws passed
+        to requests.get"""
+        hook = OAuthHook(**self.client_params)
+        client = requests.session(hooks={'pre_request': hook})
+        client.get = wrapget(client.get)
+        response = mdict2sdict(parse_qs(client.get(url, cache=False, params=kw).text))
+        return dict(secret=response["oauth_token_secret"], key=response["oauth_token"])
+
+    def access_token(self, url, token_key, token_secret, **kw):
+        """Authorize the unauthorized token using the verifier."""
+        header_auth = kw.pop('header_auth', False)
+        if "verifier" in kw:
+            kw['oauth_verifier'] = kw.pop("verifier")
+        client = oauth_client(token_key, token_secret, self.key, self.secret, header_auth=header_auth)
+        data = mdict2sdict(parse_qs(client.get(url, params=kw, cache=False).text))
+        # XXX: Compatability with old oauth library only, should eventually migrate off
+        data["secret"] = data["oauth_token_secret"]
+        data["key"] = data["oauth_token"]
+        return data
+
 
 class OAuthGetter(object):
     """A getter that will sign requests with OAuth v1.0a headers/url params."""
@@ -130,6 +163,10 @@ def cache_manager(func):
     """Another decorator for requests.get which manages the header cache."""
     @wraps(func)
     def wrapper(*a, **kw):
+        # allow the caller to set nocache
+        if not kw.pop('cache', True):
+            return func(*a, **kw)
+
         url = requests_url(*a, **kw)
         ch = header_cache.get(url)
         if "expires" in ch and ch["expires"] > utcnow():
