@@ -61,7 +61,7 @@ def join(*parts):
 
 # -- Oauth --
 
-def oauth_client(token, secret, consumer_key, consumer_secret, header_auth=False):
+def oauth_client(token, secret, consumer_key, consumer_secret, header_auth=True):
     """An OAuth client that can issue get requests."""
     hook = OAuthHook(token, secret, consumer_key, consumer_secret, header_auth)
     client = requests.session(hooks={'pre_request': hook})
@@ -73,7 +73,10 @@ def oauth_client(token, secret, consumer_key, consumer_secret, header_auth=False
 class OAuthTokenGetter(object):
     """A getter for requesting tokens and authorizing those tokens."""
     def __init__(self, consumer_key, consumer_secret):
-        self.client_params = {'consumer_key': consumer_key, 'consumer_secret': consumer_secret}
+        self.client_params = {
+            'consumer_key': consumer_key,
+            'consumer_secret': consumer_secret,
+            'header_auth': True}
         self.key = consumer_key
         self.secret = consumer_secret
 
@@ -82,13 +85,13 @@ class OAuthTokenGetter(object):
         to requests.get"""
         hook = OAuthHook(**self.client_params)
         client = requests.session(hooks={'pre_request': hook})
-        client.get = wrapget(client.get)
-        response = mdict2sdict(parse_qs(client.get(url, cache=False, params=kw).text))
-        return dict(secret=response["oauth_token_secret"], key=response["oauth_token"])
+        response = client.get(url, **kw)
+        data = mdict2sdict(parse_qs(response.text))
+        return dict(secret=data["oauth_token_secret"], key=data["oauth_token"])
 
     def access_token(self, url, token_key, token_secret, **kw):
         """Authorize the unauthorized token using the verifier."""
-        header_auth = kw.pop('header_auth', False)
+        header_auth = kw.pop('header_auth', True)
         if "verifier" in kw:
             kw['oauth_verifier'] = kw.pop("verifier")
         client = oauth_client(token_key, token_secret, self.key, self.secret, header_auth=header_auth)
@@ -102,7 +105,7 @@ class OAuthTokenGetter(object):
 class OAuthGetter(object):
     """A getter that will sign requests with OAuth v1.0a headers/url params."""
     def __init__(self, base_url, token, secret, key, key_secret,
-            header_auth=False, params={}, headers={}):
+            header_auth=True, params={}, headers={}):
         self.client = oauth_client(token, secret, key, key_secret, header_auth)
         self.base_url = base_url
         self.default_params = params.copy()
@@ -113,6 +116,14 @@ class OAuthGetter(object):
         kw['params'] = merge(self.default_params, kw.get('params', {}))
         kw['headers'] = merge(self.default_headers, kw.get('headers', {}))
         return self.client.get(url, *a, **kw)
+
+    @classmethod
+    def partial(cls, url, key, key_secret, header_auth=True, params={}, headers={}):
+        """Returns a method that will build an OAuthGetter based on the parameters."""
+        def closure(token, secret):
+            return OAuthGetter(url, token, secret, key, key_secret,
+                header_auth=header_auth, params=params, headers=headers)
+        return closure
 
 class Getter(object):
     """A simple getter that uses the basic 'get' but stores default base
@@ -252,4 +263,5 @@ class DummyHeaderCache(HeaderCache):
 
 header_cache = HeaderCache() if settings.enable_header_cache else DummyHeaderCache()
 get = wrapget(requests.get)
+post = wrapget(requests.post)
 
