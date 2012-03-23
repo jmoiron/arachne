@@ -31,6 +31,9 @@ class Memcached(object):
         self.pool[current] = con
         return con
 
+    def add(self, key, value):
+        self.client().add(key, value)
+
     def get(self, key):
         ret = self.client().get(key)
         return ret[0] if ret else ret
@@ -43,6 +46,10 @@ class Memcached(object):
 
     def decr(self, key):
         self.client().decr(key, *a)
+
+    def get_multi(self, *keys):
+        d = self.client().get_multi(keys)
+        return dict([(k,v[0]) for k,v in d.iteritems()])
 
     def version(self):
         return self.client().version()
