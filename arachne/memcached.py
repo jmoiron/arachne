@@ -44,7 +44,7 @@ class Memcached(object):
     def incr(self, key, *a):
         self.client().incr(key, *a)
 
-    def decr(self, key):
+    def decr(self, key, *a):
         self.client().decr(key, *a)
 
     def get_multi(self, *keys):

@@ -31,14 +31,21 @@ class Mysql(object):
         return con
 
     def query(self, sql, args=None):
+        """Return the results for a query."""
         c = self.client()
         if args:
             return c.query(sql, args)
         return c.query(sql)
+
+    def getone(self, sql, args=None):
+        return self.query(sql, args)[0]
 
     def dquery(self, sql, args=None):
         """Return a list of dictionaries instead of tuples from a query."""
         results = self.query(sql, args)
         fields = [f[0] for f in results.fields]
         return [dict(zip(fields, row)) for row in results.rows]
+
+    def dgetone(self, sql, args=None):
+        return self.dquery(sql, args)[0]
 

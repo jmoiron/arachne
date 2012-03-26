@@ -264,4 +264,5 @@ class DummyHeaderCache(HeaderCache):
 header_cache = HeaderCache() if settings.enable_header_cache else DummyHeaderCache()
 get = wrapget(requests.get)
 post = wrapget(requests.post)
+head = wrapget(requests.head)
 
