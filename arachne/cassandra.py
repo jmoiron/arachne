@@ -45,6 +45,8 @@ class Cassandra(object):
         self.client = pycassa.ColumnFamily(self.pool, self.cf_content)
 
     def set(self, user_id, data, uuid=None):
-        self.client.insert(str(user_id), {uuid: encode(data)})
+        return self.client.insert(str(user_id), {uuid: encode(data)})
 
+    def get(self, user_id, uuid):
+        return decode(self.client.get(str(user_id), columns=[uuid]).values()[0])
 
