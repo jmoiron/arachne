@@ -24,7 +24,6 @@ from oauth_hook import OAuthHook
 
 json_types = (
     'application/json',
-    'application/json;charset=UTF-8', # linkedin
     'application/javascript',
     'text/javascript',
     'text/json',
@@ -50,6 +49,9 @@ def requests_url(*a, **kw):
     if 'params' in kw:
         return '%s?%s' % (a[0], urlencode(kw['params']))
     return a[0]
+
+def cgi_clean(result):
+    return mdict2sdict(parse_qs(result))
 
 def join(*parts):
     """A version of urljoin which works on more than one argument."""
@@ -86,7 +88,7 @@ class OAuthTokenGetter(object):
         hook = OAuthHook(**self.client_params)
         client = requests.session(hooks={'pre_request': hook})
         response = client.get(url, **kw)
-        data = mdict2sdict(parse_qs(response.text))
+        data = cgi_clean(response.text)
         return dict(secret=data["oauth_token_secret"], key=data["oauth_token"])
 
     def access_token(self, url, token_key, token_secret, **kw):
@@ -95,7 +97,7 @@ class OAuthTokenGetter(object):
         if "verifier" in kw:
             kw['oauth_verifier'] = kw.pop("verifier")
         client = oauth_client(token_key, token_secret, self.key, self.secret, header_auth=header_auth)
-        data = mdict2sdict(parse_qs(client.get(url, params=kw, cache=False).text))
+        data = cgi_clean(client.get(url, params=kw, cache=False).text)
         # XXX: Compatability with old oauth library only, should eventually migrate off
         data["secret"] = data["oauth_token_secret"]
         data["key"] = data["oauth_token"]
@@ -128,10 +130,11 @@ class OAuthGetter(object):
 class Getter(object):
     """A simple getter that uses the basic 'get' but stores default base
     url, params, and headers.  Very similar to request's sessions."""
-    def __init__(self, base_url, params={}, headers={}, ignore_errors=False):
+    def __init__(self, base_url, params={}, headers={}, data={}, ignore_errors=False):
         self.base_url = base_url
         self.default_params = params.copy()
         self.default_headers = headers.copy()
+        self.default_data = data.copy()
         self.ignore_errors = ignore_errors
 
     def get(self, url, *a, **kw):
@@ -140,6 +143,15 @@ class Getter(object):
         kw['headers'] = merge(self.default_headers, kw.get('headers', {}))
         kw['ignore_errors'] = self.ignore_errors
         return get(url, *a, **kw)
+
+    def post(self, url, *a, **kw):
+        url = join(self.base_url, url)
+        kw['params'] = merge(self.default_params, kw.get('params', {}))
+        kw['headers'] = merge(self.default_headers, kw.get('headers', {}))
+        kw['data'] = merge(self.default_data, kw.get('data', {}))
+        kw['ignore_errors'] = self.ignore_errors
+        return post(url, *a, **kw)
+
 
 def wrapget(func):
     """Wrap requests' `get` function with utility, convenience, book-keeping."""
@@ -157,8 +169,7 @@ def wrapget(func):
 
         response = func(*a, **kw)
         # parse json
-        if response.headers['content-type'] in json_types or \
-           response.headers['content-type'].startswith('application/json') or is_json:
+        if response.headers['content-type'].split(';')[0] in json_types or is_json:
             response.json = json.loads(response.content) if response.content else {}
         # if an error occured and we waned to raise an exception, do it;  we
         # can still take the response off of this error

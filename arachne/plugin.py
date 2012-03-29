@@ -73,6 +73,7 @@ class Plugin(object):
                 method = classdict[name]
                 method.exposed = True
                 method.interval = getattr(method, 'interval', default_interval)
+                method.plugin = self
                 exposed[name] = member
         return exposed
 

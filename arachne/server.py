@@ -38,7 +38,7 @@ class Server(object):
             return method(**args)
         except TypeError, e:
             if "takes" in e.message and "arguments" in e.message:
-                return "%s\nargspec: %s\n" % (traceback.format_exc(), argspec(method))
+                return "%s\nargspec: %s.%s\n" % (traceback.format_exc(), method.plugin.plugin_name, argspec(method))
             return traceback.format_exc()
         except HttpError, e:
             message = "%s Cancelled %s/%s" % (e.message, method.im_self.plugin_name, method.__name__)
