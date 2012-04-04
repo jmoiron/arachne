@@ -68,6 +68,7 @@ def oauth_client(token, secret, consumer_key, consumer_secret, header_auth=True)
     hook = OAuthHook(token, secret, consumer_key, consumer_secret, header_auth)
     client = requests.session(hooks={'pre_request': hook})
     client.get = wrapget(client.get)
+    client.post = wrapget(client.post)
     return client
 
 # -- HTTP Get wrappers --
@@ -118,6 +119,12 @@ class OAuthGetter(object):
         kw['params'] = merge(self.default_params, kw.get('params', {}))
         kw['headers'] = merge(self.default_headers, kw.get('headers', {}))
         return self.client.get(url, *a, **kw)
+
+    def post(self, url, *a, **kw):
+        url = join(self.base_url, url)
+        kw['params'] = merge(self.default_params, kw.get('params', {}))
+        kw['headers'] = merge(self.default_headers, kw.get('headers', {}))
+        return self.client.post(url, *a, **kw)
 
     @classmethod
     def partial(cls, url, key, key_secret, header_auth=True, params={}, headers={}):
