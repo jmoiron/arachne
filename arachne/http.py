@@ -11,7 +11,7 @@ from datetime import datetime
 from dateutil.parser import parse as dateparse
 
 from functools import wraps
-from urllib import urlencode
+from urllib import urlencode, quote
 from urlparse import urljoin, parse_qs
 from hashlib import md5
 
@@ -75,11 +75,12 @@ def oauth_client(token, secret, consumer_key, consumer_secret, header_auth=True)
 
 class OAuthTokenGetter(object):
     """A getter for requesting tokens and authorizing those tokens."""
-    def __init__(self, consumer_key, consumer_secret):
+    def __init__(self, consumer_key, consumer_secret, **kw):
         self.client_params = {
             'consumer_key': consumer_key,
             'consumer_secret': consumer_secret,
             'header_auth': True}
+        self.client_params.update(kw)
         self.key = consumer_key
         self.secret = consumer_secret
 
