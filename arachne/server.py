@@ -4,18 +4,32 @@
 """servers."""
 
 import logging
+import traceback
 from uuid import uuid4
 from time import time, mktime
 from functools import wraps
 
 import gevent
-from gevent.wsgi import WSGIServer
+from gevent.wsgi import WSGIServer, WSGIHandler
 from arachne.http import HttpError, CacheHit
 from arachne.conf import settings
 from arachne.utils import argspec, Heap
 from arachne import amqp
 
 import traceback
+
+class CustomHandler(WSGIHandler):
+    logger = logging.getLogger("wsgi")
+    def log_request(self, *args):
+        self.logger.info(self.format_request())
+
+    def log_error(self, msg, *args):
+        try:
+            message = msg % args
+        except Exception:
+            self.logger.error(traceback.format_exc())
+            message = "%r %r" % (msg, args)
+        self.logger.error(message)
 
 def autospawn(func):
     @wraps(func)
@@ -51,8 +65,8 @@ class Server(object):
             return traceback.format_exc()
 
     def serve(self, port, app, block=False):
-        from gevent.wsgi import WSGIServer
         server = WSGIServer(('', port), app)
+        server.handler_class = CustomHandler
         if not block:
             self.greenlets.append(gevent.spawn(server.serve_forever))
         else:
