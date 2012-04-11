@@ -14,6 +14,8 @@ class Registry(defaultdict):
     def __getattr__(self, name):
         if name in self: return self[name]
         return None
+    def __setattr__(self, name, val):
+        self[name] = val
 
 def argspec(function, ignore_self=True):
     """Returns a properly formatted argspec for a function.  If ignore_self is
