@@ -22,6 +22,10 @@ from arachne.utils import encode, decode
 # OAuth v1.0a support from requests-oauth
 from oauth_hook import OAuthHook
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 json_types = (
     'application/json',
     'application/javascript',
@@ -101,6 +105,8 @@ class OAuthTokenGetter(object):
         client = oauth_client(token_key, token_secret, self.key, self.secret, header_auth=header_auth)
         data = cgi_clean(client.get(url, params=kw, cache=False).text)
         # XXX: Compatability with old oauth library only, should eventually migrate off
+        if "oauth_token_secret" not in data:
+            logger.error("OAuth access token error: %s" % data)
         data["secret"] = data["oauth_token_secret"]
         data["key"] = data["oauth_token"]
         return data
