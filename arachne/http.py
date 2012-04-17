@@ -103,10 +103,11 @@ class OAuthTokenGetter(object):
         if "verifier" in kw:
             kw['oauth_verifier'] = kw.pop("verifier")
         client = oauth_client(token_key, token_secret, self.key, self.secret, header_auth=header_auth)
-        data = cgi_clean(client.get(url, params=kw, cache=False).text)
+        response = client.get(url, params=kw, cache=False).text
+        data = cgi_clean(response)
         # XXX: Compatability with old oauth library only, should eventually migrate off
         if "oauth_token_secret" not in data:
-            logger.error("OAuth access token error: %s" % data)
+            logger.error("OAuth access token error: %s (%s)" % (data, response))
         data["secret"] = data["oauth_token_secret"]
         data["key"] = data["oauth_token"]
         return data
