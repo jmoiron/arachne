@@ -43,6 +43,36 @@ def decode(data):
     """Decode data coming out of storage."""
     return json.loads(zlib.decompress(data))
 
+from Queue import Queue
+
+class ConnectionPool(object):
+    """A simple connection pool which uses a queue to limit how many
+    connections to a single resource are made.  Override the `connection`
+    method to make new connections to your resource."""
+    def __init__(self, maxsize=10):
+        self.maxsize = maxsize
+        self.pool = Queue()
+        self.size = 0
+
+    def get(self):
+        pool = self.pool
+        if self.size >= self.maxsize or pool.qsize():
+            return pool.get()
+        self.size += 1
+        try:
+            con = self.connection()
+        except:
+            self.size -= 1
+            raise
+        return con
+
+    def put(self, con):
+        self.pool.put(con)
+
+    def connection(self, *a, **kw):
+        raise NotImplementedError
+
+
 from heapq import heappush, heappop, heapify, heapreplace
 
 class Heap(object):

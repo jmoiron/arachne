@@ -7,35 +7,41 @@ per greenlet."""
 import umysql
 import gevent
 
+from arachne.utils import ConnectionPool
 from arachne.conf import settings, merge, require
 
 defaults = {
     "port": 3306,
 }
 
+class MysqlConnectionPool(ConnectionPool):
+    def __init__(self, config, maxsize=10):
+        maxsize = int(config.get("poolsize", maxsize))
+        super(MysqlConnectionPool, self).__init__(maxsize)
+        self.config = config
+
+    def connection(self):
+        c = self.config
+        con = umysql.Connection()
+        con.connect(c['host'], c['port'], c['username'], c['password'], c['database'])
+        return con
+
 class Mysql(object):
     def __init__(self, **kw):
         config = merge(defaults, settings.like("mysql"), kw)
         require(self, config, ("host", "password", "username", "database"))
         self.config = config
-        self.pool = {}
-
-    def client(self):
-        current = gevent.getcurrent()
-        if current in self.pool:
-            return self.pool[current]
-        c = self.config
-        con = umysql.Connection()
-        con.connect(c['host'], c['port'], c['username'], c['password'], c['database'])
-        self.pool[current] = con
-        return con
+        self.pool = MysqlConnectionPool(config)
 
     def query(self, sql, args=None):
         """Return the results for a query."""
-        c = self.client()
-        if args:
-            return c.query(sql, args)
-        return c.query(sql)
+        c = self.pool.get()
+        try:
+            if args:
+                return c.query(sql, args)
+            return c.query(sql)
+        finally:
+            self.pool.put(c)
 
     def getone(self, sql, args=None):
         return self.query(sql, args)[0]
