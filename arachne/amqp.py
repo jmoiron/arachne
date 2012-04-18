@@ -87,8 +87,8 @@ class AmqpClient(object):
         return dict(name=status[0], messages=status[1], consumers=status[2])
 
     @autoreconnect
-    def publish(self, message, queue=None):
-        self.channel.basic_publish(amqp.Message(message), queue or self.queue)
+    def publish(self, message, exchange=None):
+        self.channel.basic_publish(amqp.Message(message), exchange or self.exchange)
 
     @autoreconnect
     def get(self, queue=None):
