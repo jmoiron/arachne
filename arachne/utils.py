@@ -44,6 +44,7 @@ def decode(data):
     return json.loads(zlib.decompress(data))
 
 from Queue import Queue
+import contextlib
 
 class ConnectionPool(object):
     """A simple connection pool which uses a queue to limit how many
@@ -60,7 +61,7 @@ class ConnectionPool(object):
             return pool.get()
         self.size += 1
         try:
-            con = self.connection()
+            con = self.new_connection()
         except:
             self.size -= 1
             raise
@@ -69,7 +70,15 @@ class ConnectionPool(object):
     def put(self, con):
         self.pool.put(con)
 
-    def connection(self, *a, **kw):
+    @contextlib.contextmanager
+    def connection(self):
+        con = self.get()
+        try:
+            yield con
+        finally:
+            self.put(con)
+
+    def new_connection(self, *a, **kw):
         raise NotImplementedError
 
 

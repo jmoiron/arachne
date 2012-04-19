@@ -20,7 +20,7 @@ class MysqlConnectionPool(ConnectionPool):
         super(MysqlConnectionPool, self).__init__(maxsize)
         self.config = config
 
-    def connection(self):
+    def new_connection(self):
         c = self.config
         con = umysql.Connection()
         con.connect(c['host'], c['port'], c['username'], c['password'], c['database'])
@@ -35,13 +35,10 @@ class Mysql(object):
 
     def query(self, sql, args=None):
         """Return the results for a query."""
-        c = self.pool.get()
-        try:
+        with self.pool.connection() as c:
             if args:
                 return c.query(sql, args)
             return c.query(sql)
-        finally:
-            self.pool.put(c)
 
     def getone(self, sql, args=None):
         return self.query(sql, args)[0]

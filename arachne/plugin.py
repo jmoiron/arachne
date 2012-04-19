@@ -40,7 +40,7 @@ def argument_alias(method, args):
     if not hasattr(plugin, 'aliases'):
         return args
     for k,v in plugin.aliases.iteritems():
-        args[k] = args[v]
+        args[k] = args.get(v, None)
     return args
 
 def interval(seconds, **kw):

@@ -8,6 +8,7 @@ from gevent import queue, sleep, getcurrent
 from time import time
 
 from arachne.conf import settings, merge, require
+from arachne.utils import ConnectionPool
 from kombu.transport.amqplib import Connection, amqp
 
 defaults = {
@@ -27,6 +28,17 @@ def autoreconnect(func):
         return ret
     return wrapper
 
+class AmqpConnectionPool(ConnectionPool):
+    def __init__(self, config, maxsize=10):
+        maxsize = int(config.get("poolsize", maxsize))
+        super(AmqpConnectionPool, self).__init__(maxsize)
+        self.config = config
+
+    def new_connection(self):
+        c = self.config
+        con = AmqpClient(**c)
+        return con
+
 class Amqp(object):
     def __init__(self, **kw):
         config = merge(defaults, settings.like("amqp"), kw)
@@ -34,31 +46,27 @@ class Amqp(object):
         require(self, config, required)
         self.__dict__.update(config)
         self.config = config
-        self.pool = {}
-
-    def client(self):
-        current = getcurrent()
-        if current in self.pool:
-            return self.pool[current]
-        c = self.config
-        client = AmqpClient(**c)
-        self.pool[current] = client
-        return client
+        self.pool = AmqpConnectionPool(config)
 
     def reconnect(self):
-        return self.client().reconnect()
+        with self.pool.connection() as client:
+            return client.reconnect()
 
     def status(self, **kw):
-        return self.client().status(**kw)
+        with self.pool.connection() as client:
+            return client.status(**kw)
 
     def publish(self, *a, **kw):
-        return self.client().publish(*a, **kw)
+        with self.pool.connection() as client:
+            return client.publish(*a, **kw)
 
     def get(self, *a, **kw):
-        return self.client().get(*a, **kw)
+        with self.pool.connection() as client:
+            return client.get(*a, **kw)
 
     def poll(self, *a, **kw):
-        return self.client().poll(*a, **kw)
+        with self.pool.connection() as client:
+            return client.poll(*a, **kw)
 
 class AmqpClient(object):
     def __init__(self, **kw):
