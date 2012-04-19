@@ -13,8 +13,9 @@ from kombu.transport.amqplib import Connection, amqp
 
 defaults = {
     "port": 5672,
-    "prefetch_count": 50,
+    "prefetch_count": 20,
     "queue_size": 100,
+    "poolsize": 5,
 }
 
 def autoreconnect(func):
@@ -83,6 +84,7 @@ class AmqpClient(object):
         )
         qa = dict(durable=False, auto_delete=False)
         self.channel = self.connection.channel()
+        self.channel.basic_qos(0, self.prefetch_count, False)
         self.channel.queue_declare(queue=self.queue,exclusive=False, **qa)
         self.channel.exchange_declare(self.exchange, type="fanout", **qa)
         self.channel.queue_bind(queue=self.queue, exchange=self.exchange)
