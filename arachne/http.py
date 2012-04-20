@@ -205,19 +205,22 @@ def cache_manager(func):
             return func(*a, **kw)
 
         url = requests_url(*a, **kw)
-        ch = header_cache.get(url)
-        if "expires" in ch and ch["expires"] > utcnow():
-            raise CacheHit("Expires in the future.")
-        kw.setdefault("headers", {}).update(ch)
+        if settings.enable_header_cache:
+            ch = header_cache.get(url)
+            if ch:
+                if "expires" in ch and ch["expires"] > utcnow():
+                    raise CacheHit("Expires in the future.")
+                kw.setdefault("headers", {}).update(ch)
 
         response = func(*a, **kw)
 
         if response.status_code == 304:
             raise CacheHit("304 status code.")
         # set cache control headers if available
-        ch = cache_headers(response.headers)
-        if ch:
-            header_cache.set(url, cache_headers(response.headers))
+        if settings.enable_header_cache:
+            ch = cache_headers(response.headers)
+            if ch:
+                header_cache.set(url, cache_headers(response.headers))
         return response
     return wrapper
 
@@ -254,19 +257,20 @@ def cache_headers(headers):
 def disable_header_cache():
     """Utility function to disable the header cache."""
     global header_cache
+    settings.enable_header_cache = False
     header_cache = DummyHeaderCache()
 
 def enable_header_cache(**kw):
     """Utility function to enable the header cache with arguments."""
     global header_cache
+    settings.enable_header_cache = True
     header_cache = HeaderCache(**kw)
 
 class HeaderCache(object):
     """Keeps a cache of url headers."""
     def __init__(self, **kw):
         # use specialized cache if available, else default cache location
-        self.config = merge(settings.like("header_cache"), kw)
-        self.config = merge(settings.like("memcached"), self.config)
+        self.config = merge(settings.like("memcached"), settings.like("header_cache"), kw)
         self.client = memcached.Memcached(**self.config)
 
     def get(self, url):
@@ -288,6 +292,7 @@ class DummyHeaderCache(HeaderCache):
 # -- static modifications --
 
 header_cache = HeaderCache() if settings.enable_header_cache else DummyHeaderCache()
+
 get = wrapget(requests.get)
 post = wrapget(requests.post)
 head = wrapget(requests.head)
