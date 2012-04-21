@@ -4,6 +4,7 @@
 """AMQP adapters for the scheduler."""
 
 from functools import wraps
+import logging
 from gevent import queue, sleep, getcurrent
 from time import time
 
@@ -17,6 +18,8 @@ defaults = {
     "queue_size": 100,
     "poolsize": 5,
 }
+
+logger = logging.getLogger(__name__)
 
 def autoreconnect(func):
     @wraps(func)
@@ -40,7 +43,10 @@ class AmqpConnectionPool(ConnectionPool):
         con = AmqpClient(**c)
         return con
 
-class Amqp(object):
+class AmqpPool(object):
+    """A pooled Amqp client.  Multiple connections are made and passed out
+    on demand, so they cannot be used by two different greenlets at once.  It
+    might be better to use a single amqp connection with a Consumer."""
     def __init__(self, **kw):
         config = merge(defaults, settings.like("amqp"), kw)
         required = ("port", "username", "password", "host", "vhost", "exchange", "queue")
@@ -69,10 +75,21 @@ class Amqp(object):
         with self.pool.connection() as client:
             return client.poll(*a, **kw)
 
-class AmqpClient(object):
+    def consume(self, *a, **kw):
+        with self.pool.connection() as client:
+            return client.consume(*a, **kw)
+
+    def cancel(self, *a, **kw):
+        with self.pool.connection() as client:
+            return client.cancel(*a, **kw)
+
+class Amqp(object):
     def __init__(self, **kw):
-        self.__dict__.update(kw)
-        self.config = kw
+        config = merge(defaults, settings.like("amqp"), kw)
+        required = ("port", "username", "password", "host", "vhost", "exchange", "queue")
+        require(self, config, required)
+        self.__dict__.update(config)
+        self.config = config
         self.reconnect()
 
     def reconnect(self):
@@ -121,11 +138,43 @@ class AmqpClient(object):
             m = self.get(queue)
         return m
 
-# FIXME: a joinable queue?
-class Queue(queue.Queue):
+    def consume(self, callback, queue=None, no_ack=True):
+        """Start consuming messages from a channel.  Returns the channel.
+        Use AmqpClient.cancel() to cancel this consuming."""
+        self.tag = self.channel.basic_consume(queue or self.queue, callback=callback, no_ack=no_ack)
+        return self.channel
 
-    def fill(self, client, queue=None):
+    def cancel(self, tag=None):
+        """Cancel consuming."""
+        self.channel.basic_cancel(tag or self.tag)
+
+class Consumer(object):
+    """A queue consumer.  This queue will consume a channel and fill up a local
+    synchronized queue which can then be polled by many greenlets.  The consume
+    should be much lower impact than issuing a storm of failing gets."""
+    def __init__(self, client=None, size=100):
+        self.greenlets = []
+        self.messages = queue.Queue(int(size))
+        self.client = client if client else Amqp()
+
+    def start(self):
+        channel = self.client.consume(callback=self.fill)
+        while 1:
+            try:
+                channel.wait()
+            except Exception, e:
+                self.client.cancel()
+                logger.error("Error occured while waiting on channel: %s" % e)
+                self.client.reconnect()
+                channel = self.client.consume(callback=self.fill)
+        logger.error("leaving impossible-to-leave loop")
+
+    def stop(self):
+        logger.debug("Stopping consumer")
+        self.client.cancel()
+
+    def fill(self, message):
         """Fill a local gevent-synced queue with items from a client."""
-        # FIXME: write this
+        self.messages.put(message)
 
 
