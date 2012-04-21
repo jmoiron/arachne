@@ -19,6 +19,8 @@ from arachne import memcached
 from arachne.conf import merge, settings, require
 from arachne.utils import encode, decode
 
+from humanize.filesize import naturalsize
+
 # OAuth v1.0a support from requests-oauth
 from oauth_hook import OAuthHook
 
@@ -182,10 +184,15 @@ def wrapget(func):
         ignore_errors = kw.pop('ignore_errors', True)
         is_json = kw.pop('json', False)
 
+        logger.debug(" >> get %s" % (a[0][:100]))
         response = func(*a, **kw)
+        logger.debug(" << get %s" % (a[0][:100]))
         # parse json
         if response.headers['content-type'].split(';')[0] in json_types or is_json:
+            t0 = time()
             response.json = json.loads(response.content) if response.content else {}
+            td = time() - t0
+            logger.debug(" jj %s in %0.2f" % (naturalsize(len(response.content)), td))
         # if an error occured and we waned to raise an exception, do it;  we
         # can still take the response off of this error
         if response.status_code > 400 and not ignore_errors:
