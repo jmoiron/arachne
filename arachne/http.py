@@ -35,6 +35,59 @@ json_types = (
     'text/json',
 )
 
+from requests import models
+
+import zlib
+
+def decompress(content, mode='gzip'):
+    """Decode a string.  A copy of requests' stream_decompress."""
+    if mode not in ("gzip", "deflate"):
+        raise ValueError("decompress mode must be gzip or deflate")
+    zlib_mode = 16 + zlib.MAX_WBITS if mode == 'gzip' else -zlib.MAX_WBITS
+    return zlib.decompress(content, zlib_mode)
+
+def untransfer(content, resp):
+    if "gzip" in resp.headers.get("content-encoding", ""):
+        content = decompress(content, "gzip")
+    elif "deflate" in resp.headers.get("content-encoding", ""):
+        content = decompress(content, "deflate")
+    return content
+
+class Response(models.Response):
+    def __init__(self):
+        super(Response, self).__init__()
+        # some versions set to False, some to None;  we require False
+        self._content = False
+
+    def iter_content(self, chunk_size=1, decode_unicode=False):
+        """Request's default response object will read 1 (one) byte at a time
+        from the raw response.  This normally doesn't make a huge lot of
+        difference for a gevent application, but it does if some C library
+        (like ujson, or lxml) has the GIL and will not allow any other python
+        code while gevent's hub goes loco.  This behavior absolutely kills our
+        spider's performance, so here we read the entire response in, decode,
+        and return.  Requests was also calling str.join a needless amount."""
+        content = untransfer(self.raw.read(), self)
+        return content
+
+    @property
+    def content(self):
+        if self._content is False:
+            if self._content_consumed:
+                raise RuntimeError("The content for this response was already consumed.")
+            try:
+                if self.status_code is 0:
+                    self._content = None
+                else:
+                    self._content = self.iter_content()
+            except AttributeError:
+                self._content = None
+        self._content_consumed = True
+        return self._content
+
+if models.Response != Response:
+    models.Response = Response
+
 class HttpError(Exception):
     def __init__(self, response):
         self.message = "%d encountered getting \"%s\"" % (response.status_code, response.url)
@@ -186,6 +239,8 @@ def wrapget(func):
 
         logger.debug(" >> get %s" % (a[0][:100]))
         response = func(*a, **kw)
+        # pre-load the content with a read
+        content = response.content
         logger.debug(" << get %s" % (a[0][:100]))
         # parse json
         if response.headers['content-type'].split(';')[0] in json_types or is_json:
