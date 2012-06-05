@@ -54,6 +54,10 @@ def untransfer(content, resp):
     return content
 
 class Response(models.Response):
+    # requests adds a json property in 0.13, which means our way of doing json
+    # (which, as we always need it, is probably better) was broken
+    json = None
+
     def __init__(self):
         super(Response, self).__init__()
         # some versions set to False, some to None;  we require False
