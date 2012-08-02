@@ -37,57 +37,16 @@ json_types = (
 
 from requests import models
 
-import zlib
-
-def decompress(content, mode='gzip'):
-    """Decode a string.  A copy of requests' stream_decompress."""
-    if mode not in ("gzip", "deflate"):
-        raise ValueError("decompress mode must be gzip or deflate")
-    zlib_mode = 16 + zlib.MAX_WBITS if mode == 'gzip' else -zlib.MAX_WBITS
-    return zlib.decompress(content, zlib_mode)
-
-def untransfer(content, resp):
-    if "gzip" in resp.headers.get("content-encoding", ""):
-        content = decompress(content, "gzip")
-    elif "deflate" in resp.headers.get("content-encoding", ""):
-        content = decompress(content, "deflate")
-    return content
-
 class Response(models.Response):
     # requests adds a json property in 0.13, which means our way of doing json
     # (which, as we always need it, is probably better) was broken
     json = None
 
-    def __init__(self):
-        super(Response, self).__init__()
-        # some versions set to False, some to None;  we require False
-        self._content = False
-
     def iter_content(self, chunk_size=1, decode_unicode=False):
-        """Request's default response object will read 1 (one) byte at a time
-        from the raw response.  This normally doesn't make a huge lot of
-        difference for a gevent application, but it does if some C library
-        (like ujson, or lxml) has the GIL and will not allow any other python
-        code while gevent's hub goes loco.  This behavior absolutely kills our
-        spider's performance, so here we read the entire response in, decode,
-        and return.  Requests was also calling str.join a needless amount."""
-        content = untransfer(self.raw.read(), self)
-        return content
-
-    @property
-    def content(self):
-        if self._content is False:
-            if self._content_consumed:
-                raise RuntimeError("The content for this response was already consumed.")
-            try:
-                if self.status_code is 0:
-                    self._content = None
-                else:
-                    self._content = self.iter_content()
-            except AttributeError:
-                self._content = None
-        self._content_consumed = True
-        return self._content
+        """Request's default response object will read 10k bytes at a time.
+        It used to read only 1 byte at a time.  Instead of patching requests
+        to change the behavior, we hardcode the chunk size here to 500k."""
+        return super(Response, self).iter_content(500*1024, decode_unicode)
 
 if models.Response != Response:
     models.Response = Response
