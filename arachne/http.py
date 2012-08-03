@@ -46,7 +46,9 @@ class Response(models.Response):
         """Request's default response object will read 10k bytes at a time.
         It used to read only 1 byte at a time.  Instead of patching requests
         to change the behavior, we hardcode the chunk size here to 500k."""
-        return super(Response, self).iter_content(500*1024, decode_unicode)
+        # get a chunk_size from the settings value "transfer_chunk_size";
+        chunk_size = settings.get("transfer_chunk_size", 500*1024)
+        return super(Response, self).iter_content(chunk_size, decode_unicode)
 
 if models.Response != Response:
     models.Response = Response
