@@ -4,7 +4,8 @@
 """Http support for spider activity."""
 
 import requests
-import ujson as json
+#import ujson as json
+import simplejson as json
 from time import time, mktime
 from contextlib import contextmanager
 from datetime import datetime

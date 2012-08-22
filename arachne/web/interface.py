@@ -4,7 +4,8 @@
 """A gevent/wsgi/flask re-implementation of the interface server."""
 
 import sys
-import ujson as json
+#import ujson as json
+import simplejson as json
 from humanize.time import naturaldelta
 from flask import Flask, Response, request, abort
 from arachne import plugin, http

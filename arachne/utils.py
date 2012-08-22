@@ -7,7 +7,8 @@ import re
 import inspect
 import time
 import zlib
-import ujson as json
+#import ujson as json
+import simplejson as json
 import logging
 from functools import wraps
 from collections import defaultdict
